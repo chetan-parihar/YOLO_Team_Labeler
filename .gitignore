@@ -1,2 +1,5 @@
 venv/
 images/
+__pycache__/
+*.pt
+runs/

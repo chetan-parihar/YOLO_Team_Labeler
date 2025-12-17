@@ -1,6 +1,8 @@
+
 import os
 import json
 import threading
+import socket  
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from fastapi import FastAPI, UploadFile, Form, HTTPException
@@ -19,7 +21,7 @@ class ServerState:
     def __init__(self):
         self.image_folder = ""
         self.label_folder = ""
-        self.model_path = "yolov8n.pt"
+        self.model_path = "yolov8x.pt"
         self.model = None
         self.conf_threshold = 0.25  # Default Confidence
         self.in_progress = {} # {user: image_name}
@@ -192,7 +194,7 @@ class ServerGUI:
 
         # 2. Model Selection
         tk.Label(config_frame, text="Model Path:").grid(row=1, column=0, sticky="w")
-        self.model_var = tk.StringVar(value="yolov8n.pt")
+        self.model_var = tk.StringVar(value="yolov8x.pt")
         self.model_entry = tk.Entry(config_frame, textvariable=self.model_var, width=40)
         self.model_entry.grid(row=1, column=1, padx=5)
         
@@ -208,9 +210,13 @@ class ServerGUI:
         self.conf_scale.set(0.25)
         self.conf_scale.grid(row=2, column=1, columnspan=2, sticky="w", pady=5)
 
-        # 4. Start Server (Spans 3 rows now)
+        # 4. IP Address Display (NEW)
+        ip_addr = self.get_local_ip()
+        tk.Label(config_frame, text=f"Server IP: {ip_addr}", fg="blue", font=("Arial", 11, "bold")).grid(row=3, column=0, columnspan=3, sticky="w", pady=5)
+
+        # 5. Start Server (Spans 4 rows now)
         self.start_btn = tk.Button(config_frame, text="START SERVER", bg="lightgreen", font=("Arial", 10, "bold"), command=self.start_server_thread)
-        self.start_btn.grid(row=0, column=4, rowspan=3, padx=10, sticky="nsew")
+        self.start_btn.grid(row=0, column=4, rowspan=4, padx=10, sticky="nsew")
 
         # --- Tabs ---
         self.notebook = ttk.Notebook(root)
@@ -231,6 +237,18 @@ class ServerGUI:
         self.train_tab = tk.Frame(self.notebook)
         self.notebook.add(self.train_tab, text="Training")
         self.setup_training_tab()
+
+    def get_local_ip(self):
+        """Helper to get the local IP address."""
+        try:
+            # Connect to a dummy external IP to determine the correct interface
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
 
     def append_log(self, msg):
         self.log_text.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
@@ -272,7 +290,7 @@ class ServerGUI:
             messagebox.showerror("Error", "Select Image Folder first.")
             return
         
-        initial_model = self.model_var.get() or "yolov8n.pt"
+        initial_model = self.model_var.get() or "yolov8x.pt"
         if os.path.exists(initial_model):
             server_state.load_model(initial_model)
         else:
@@ -362,7 +380,7 @@ class ServerGUI:
         grid = tk.Frame(f)
         grid.pack(pady=10)
         tk.Label(grid, text="Epochs:").grid(row=0, column=0); 
-        self.epochs_ent = tk.Entry(grid, width=5); self.epochs_ent.insert(0,"10"); self.epochs_ent.grid(row=0,column=1)
+        self.epochs_ent = tk.Entry(grid, width=5); self.epochs_ent.insert(0,"100"); self.epochs_ent.grid(row=0,column=1)
         tk.Label(grid, text="Batch:").grid(row=0, column=2); 
         self.batch_ent = tk.Entry(grid, width=5); self.batch_ent.insert(0,"16"); self.batch_ent.grid(row=0,column=3)
 
@@ -403,7 +421,7 @@ class ServerGUI:
 
             self.append_log(f"Starting training ({epochs} epochs)...")
             
-            base_model = server_state.model_path if server_state.model_path else "yolov8n.pt"
+            base_model = server_state.model_path if server_state.model_path else "yolov8x.pt"
             self.append_log(f"Base model: {os.path.basename(base_model)}")
             
             train_model = YOLO(base_model)
